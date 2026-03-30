@@ -21,7 +21,7 @@ Provide data-driven business recommendations
 | Table Name   | Description                                     |
 | ------------ | ----------------------------------------------- |
 | employee     | Employee details including job title and levels |
-| customer     | Customer information (name, email, country)     |
+| customer     | Customer information      |
 | invoice      | Billing details and total purchases             |
 | invoice_line | Line-level transaction details                  |
 | track        | Track information including genre and duration  |
