@@ -1,0 +1,172 @@
+select * from employee
+order by levels desc
+
+--  countries have the most invoices. 
+Select billing_country,count(*) from invoice
+group by billing_country
+order by billing_country desc
+
+--  top 3 invoice totals
+select * from invoice
+select top 3 invoice_id from invoice
+
+-- the city with the highest total invoice amount to determine the best location for 
+-- a promotional event.
+select billing_city,
+Sum(total)  as total_invoice_amount
+from invoice
+group by billing_city
+order by total_invoice_amount desc
+
+-- customer who has spent the most money. 
+select customer_id, sum(total) as money_spent
+from invoice
+group by customer_id
+order by money_spent desc 
+
+-- Find the email, first name, and last name of customers who listen to Rock music. 
+
+select c.email, 
+c.first_name,
+c.last_name,
+g.name
+from
+customer c
+join 
+invoice i on
+c.customer_id = i.customer_id
+join
+invoice_line il
+on i.invoice_id = il.invoice_id
+join track t
+on il.track_id = t.track_id
+join genre g
+on t.genre_id = g.genre_id
+where g.name = 'Rock'
+order by c.email
+
+-- Identify the top 10 rock artists based on track count. 
+select top 10 a.name as artist_name,
+count(t.track_id) as track_count
+from artist a
+join album al
+on a.artist_id = al.artist_id
+join track t
+on al.album_id = t.album_id
+join genre g
+on g.genre_id = t.genre_id
+where g.name = 'Rock'
+group by a.artist_id,a.name 
+order by track_count desc
+
+-- All track names that are longer than the average track length
+
+SELECT name
+FROM track
+WHERE milliseconds > (
+        SELECT AVG(milliseconds)
+        FROM track
+);
+
+-- Calculate how much each customer has spent on each artist.
+WITH artist_earnings AS (
+    SELECT 
+        il.invoice_id,
+        -- t.album_id,
+        SUM(il.unit_price * il.quantity) AS amount_spent
+    FROM invoice_line il
+    --JOIN track t 
+        --ON il.track_id = t.track_id
+    GROUP BY il.invoice_id
+    --t.album_id
+)
+
+SELECT 
+    c.customer_id,
+    c.first_name,
+    c.last_name,
+    ar.name AS artist_name,
+    SUM(ae.amount_spent) AS total_spent
+FROM artist_earnings ae
+JOIN invoice i 
+    ON ae.invoice_id = i.invoice_id
+JOIN customer c 
+    ON i.customer_id = c.customer_id
+JOIN album al 
+    ON ae.album_id = al.album_id
+JOIN artist ar 
+    ON al.artist_id = ar.artist_id
+GROUP BY c.customer_id, c.first_name, c.last_name, ar.name
+ORDER BY total_spent DESC;
+
+-- Determine the most popular music genre for each country based on purchases.
+WITH genre_purchases AS (
+    SELECT 
+        c.country,
+        g.name AS genre_name,
+        COUNT(il.quantity) AS purchase_count
+    FROM customer c
+    JOIN invoice i 
+        ON c.customer_id = i.customer_id
+    JOIN invoice_line il 
+        ON i.invoice_id = il.invoice_id
+    JOIN track t 
+        ON il.track_id = t.track_id
+    JOIN genre g 
+        ON t.genre_id = g.genre_id
+    GROUP BY c.country, g.name
+),
+
+ranked_genres AS (
+    SELECT 
+        country,
+        genre_name,
+        purchase_count,
+        RANK() OVER (
+            PARTITION BY country 
+            ORDER BY purchase_count DESC
+        ) AS rank_genre
+    FROM genre_purchases
+)
+
+SELECT 
+    country,
+    genre_name,
+    purchase_count
+FROM ranked_genres
+WHERE rank_genre = 1
+ORDER BY country;
+
+
+--  Identify the top-spending customer for each country
+WITH customer_spending AS (
+    SELECT 
+        c.customer_id,
+        c.first_name,
+        c.last_name,
+        c.country,
+        SUM(i.total) AS total_spent
+    FROM customer c
+    JOIN invoice i 
+        ON c.customer_id = i.customer_id
+    GROUP BY c.customer_id, c.first_name, c.last_name, c.country
+),
+
+ranked_customers AS (
+    SELECT *,
+           RANK() OVER(
+               PARTITION BY country
+               ORDER BY total_spent DESC
+           ) AS spending_rank
+    FROM customer_spending
+)
+
+SELECT 
+    country,
+    customer_id,
+    first_name,
+    last_name,
+    total_spent
+FROM ranked_customers
+WHERE spending_rank = 1
+ORDER BY country;
